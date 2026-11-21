@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medication Reminder — Medicine Schedule Manager</title>
+<meta name="description" content="A calm, simple medicine schedule manager. Track doses, stock and weekly adherence — all in your browser.">
+<style>
+  :root{
+    --bg:#e9f7f1;
+    --bg-soft:#f4fbf8;
+    --card:#ffffff;
+    --ink:#173b33;
+    --muted:#5f7f76;
+    --accent:#14b8a6;
+    --accent-dark:#0f766e;
+    --accent-soft:#ccfbf1;
+    --mint-line:#d7efe6;
+    --warn-bg:#fff7e6;
+    --warn-border:#f5c86b;
+    --warn-ink:#7a5410;
+    --danger:#dc2626;
+    --radius:20px;
+    --shadow:0 6px 24px rgba(20,120,100,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{max-width:100%;overflow-x:hidden}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:linear-gradient(180deg,var(--bg) 0%,var(--bg-soft) 100%);
+    color:var(--ink);
+    min-height:100vh;
+    padding:20px 14px 40px;
+  }
+  .wrap{max-width:720px;margin:0 auto;width:100%}
+
+  /* Header */
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{
+    width:56px;height:56px;flex:0 0 56px;border-radius:18px;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 20px rgba(20,184,166,.35);
+  }
+  .logo svg{width:32px;height:32px}
+  h1{font-size:1.65rem;line-height:1.15;letter-spacing:-.02em}
+  .tagline{color:var(--muted);font-size:.95rem;margin-top:3px}
+  .date-line{color:var(--accent-dark);font-weight:600;font-size:.92rem;margin:14px 2px 0}
+
+  /* Cards & sections */
+  section.card{
+    background:var(--card);border:1px solid var(--mint-line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px;margin-top:16px;
+  }
+  h2{font-size:1.15rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  h2 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:0 0 10px}
+  .empty{color:var(--muted);font-size:.95rem;padding:10px 2px;line-height:1.5}
+
+  /* Low stock banner */
+  #lowStockBanner{
+    display:none;margin-top:16px;background:var(--warn-bg);border:1.5px solid var(--warn-border);
+    border-radius:var(--radius);padding:16px 18px;color:var(--warn-ink);
+  }
+  #lowStockBanner.show{display:block}
+  #lowStockBanner strong{font-size:1rem;letter-spacing:.02em}
+  #lowStockBanner ul{margin:8px 0 0 18px;line-height:1.55;font-size:.95rem}
+
+  /* Adherence */
+  .adherence-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  #adherencePct{font-size:2.2rem;font-weight:800;color:var(--accent-dark);line-height:1}
+  .adherence-label{color:var(--muted);font-size:.92rem}
+  .bars{display:flex;gap:8px;align-items:flex-end;height:86px;margin-top:16px}
+  .bar-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+  .bar-track{width:100%;max-width:38px;height:58px;background:var(--bg);border-radius:10px;display:flex;align-items:flex-end;overflow:hidden}
+  .bar-fill{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent-dark));border-radius:10px 10px 0 0;min-height:0}
+  .bar-day{font-size:.72rem;color:var(--muted);font-weight:600}
+  .bar-pct{font-size:.68rem;color:var(--accent-dark);font-weight:700}
+
+  /* Today doses */
+  .dose-card{
+    display:flex;align-items:center;gap:14px;background:var(--bg-soft);
+    border:1.5px solid var(--mint-line);border-radius:18px;padding:14px 16px;margin-top:12px;
+  }
+  .dose-card:first-of-type{margin-top:2px}
+  .dose-info{flex:1 1 auto;min-width:0}
+  .dose-name{font-weight:700;font-size:1.05rem;overflow-wrap:break-word}
+  .dose-meta{color:var(--muted);font-size:.9rem;margin-top:2px}
+  .dose-time{font-weight:800;color:var(--accent-dark);font-size:1.05rem;white-space:nowrap}
+  .check-btn{
+    flex:0 0 auto;width:56px;height:56px;border-radius:50%;border:2.5px solid var(--accent);
+    background:#fff;color:var(--accent-dark);font-size:1.5rem;font-weight:800;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;line-height:1;
+    transition:background .15s ease,transform .1s ease;
+  }
+  .check-btn:active{transform:scale(.94)}
+  .check-btn:focus-visible,.chip:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid rgba(20,184,166,.45);outline-offset:2px}
+  .dose-card.done{background:var(--accent-soft);border-color:var(--accent)}
+  .dose-card.done .dose-name{text-decoration:line-through;opacity:.75}
+  .dose-card.done .check-btn{background:var(--accent);color:#fff}
+  .check-btn:disabled{border-color:#cbd5d1;background:#eef3f1;color:#94a8a2;cursor:not-allowed}
+  .stock-note{font-size:.82rem;color:var(--danger);font-weight:600;margin-top:4px}
+  @keyframes pulseRing{
+    0%{box-shadow:0 0 0 0 rgba(20,184,166,.45)}
+    70%{box-shadow:0 0 0 12px rgba(20,184,166,0)}
+    100%{box-shadow:0 0 0 0 rgba(20,184,166,0)}
+  }
+  .dose-card.due{border-color:var(--accent);animation:pulseRing 1.8s ease-out infinite}
+  .dose-card.notified{border-color:var(--warn-border);background:var(--warn-bg)}
+
+  /* Form */
+  label.field{display:block;margin-top:14px;font-weight:600;font-size:.92rem}
+  label.field:first-of-type{margin-top:0}
+  input[type="text"],input[type="number"],input[type="time"],textarea{
+    width:100%;margin-top:6px;padding:13px 14px;font-size:1rem;color:var(--ink);
+    border:1.5px solid var(--mint-line);border-radius:14px;background:#fff;font-family:inherit;
+  }
+  textarea{resize:vertical;min-height:56px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .chip{
+    border:2px solid var(--accent);background:#fff;color:var(--accent-dark);
+    padding:12px 18px;border-radius:999px;font-size:.98rem;font-weight:700;cursor:pointer;min-height:48px;
+  }
+  .chip.active{background:var(--accent);color:#fff}
+  .chip small{display:block;font-weight:600;font-size:.75rem;opacity:.85}
+  .custom-times{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+  .custom-row{display:flex;gap:8px;align-items:center}
+  .custom-row input[type="time"]{margin-top:0;flex:1 1 auto}
+  .remove-time{
+    flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1.5px solid var(--mint-line);
+    background:#fff;color:var(--danger);font-size:1.15rem;font-weight:700;cursor:pointer;
+  }
+  .btn{
+    border:none;border-radius:14px;padding:14px 20px;font-size:1rem;font-weight:700;cursor:pointer;
+    min-height:50px;font-family:inherit;
+  }
+  .btn-primary{background:var(--accent);color:#fff;width:100%;margin-top:18px}
+  .btn-primary:hover{background:var(--accent-dark)}
+  .btn-ghost{background:#fff;border:1.5px solid var(--accent);color:var(--accent-dark)}
+  .btn-small{padding:10px 14px;min-height:44px;font-size:.9rem;border-radius:12px}
+  #addTimeBtn{margin-top:10px}
+  #cancelEditBtn{display:none;width:100%;margin-top:10px}
+  .form-error{display:none;color:var(--danger);font-weight:600;font-size:.92rem;margin-top:12px}
+  .form-error.show{display:block}
+
+  /* Medicine list */
+  .med-card{border:1.5px solid var(--mint-line);border-radius:18px;padding:16px;margin-top:12px;background:#fff}
+  .med-card:first-of-type{margin-top:2px}
+  .med-head{display:flex;align-items:flex-start;gap:10px}
+  .med-name{font-weight:800;font-size:1.08rem;flex:1 1 auto;min-width:0;overflow-wrap:break-word}
+  .med-dose{color:var(--muted);font-size:.92rem;margin-top:2px}
+  .med-times{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .time-pill{background:var(--accent-soft);color:var(--accent-dark);font-weight:700;font-size:.82rem;padding:5px 10px;border-radius:999px}
+  .med-stock{margin-top:10px;font-size:.95rem}
+  .med-stock strong{color:var(--accent-dark)}
+  .med-stock.low strong{color:var(--danger)}
+  .med-note{color:var(--muted);font-size:.9rem;margin-top:6px;line-height:1.45;overflow-wrap:break-word}
+  .med-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .edit-btn{background:var(--accent-soft);color:var(--accent-dark);border:none}
+  .delete-btn{background:#fff;color:var(--danger);border:1.5px solid #fecaca}
+
+  /* Reminders */
+  .reminder-note{color:var(--muted);font-size:.93rem;line-height:1.55;margin-top:10px}
+  #notifStatus{font-size:.92rem;font-weight:600;color:var(--accent-dark);margin-top:10px;min-height:1.2em}
+
+  footer{text-align:center;color:var(--muted);font-size:.9rem;margin-top:28px;line-height:1.6}
+  @media (max-width:420px){
+    h1{font-size:1.4rem}
+    .logo{width:48px;height:48px;flex-basis:48px;border-radius:15px}
+    section.card{padding:16px}
+    .dose-card{padding:12px}
+    .check-btn{width:52px;height:52px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="19" y="6" width="10" height="36" rx="3" fill="#ffffff"/>
+        <rect x="6" y="19" width="36" height="10" rx="3" fill="#ffffff" opacity="0.85"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Medication Reminder</h1>
+      <p class="tagline">Your daily medicine schedule, kept calm and simple.</p>
+    </div>
+  </header>
+  <p class="date-line" id="dateLine"></p>
+
+  <div id="lowStockBanner" role="alert"></div>
+
+  <section class="card" aria-label="Weekly adherence">
+    <h2><span class="dot"></span>Weekly adherence</h2>
+    <div class="adherence-top">
+      <span id="adherencePct">—</span>
+      <span class="adherence-label">of scheduled doses taken in the last 7 days</span>
+    </div>
+    <div class="bars" id="adherenceBars"></div>
+  </section>
+
+  <section class="card" aria-label="Today's doses">
+    <h2><span class="dot"></span>Today&rsquo;s doses</h2>
+    <div id="todayList"></div>
+  </section>
+
+  <section class="card" aria-label="Add or edit medicine">
+    <h2><span class="dot"></span><span id="formTitle">Add a medicine</span></h2>
+    <form id="medForm" novalidate>
+      <label class="field">Medicine name
+        <input type="text" id="medName" placeholder="e.g. Paracetamol" autocomplete="off" required>
+      </label>
+      <label class="field">Dose
+        <input type="text" id="medDose" placeholder="e.g. 1 tablet" autocomplete="off" required>
+      </label>
+
+      <span class="field" style="display:block;margin-top:14px;font-weight:600;font-size:.92rem">Schedule — tap the times you take it</span>
+      <div class="chips" id="chipRow">
+        <button type="button" class="chip" data-time="08:00">Morning<small>08:00</small></button>
+        <button type="button" class="chip" data-time="13:00">Noon<small>13:00</small></button>
+        <button type="button" class="chip" data-time="22:00">Night<small>22:00</small></button>
+      </div>
+      <div class="custom-times" id="customTimes"></div>
+      <button type="button" class="btn btn-ghost btn-small" id="addTimeBtn">+ Add a custom time</button>
+
+      <label class="field">Total stock (doses / units on hand)
+        <input type="number" id="medStock" min="0" step="1" placeholder="e.g. 30" required>
+      </label>
+      <label class="field">Note (optional)
+        <textarea id="medNote" placeholder="e.g. Take after food"></textarea>
+      </label>
+
+      <p class="form-error" id="formError"></p>
+      <button type="submit" class="btn btn-primary" id="submitBtn">Add medicine</button>
+      <button type="button" class="btn btn-ghost" id="cancelEditBtn">Cancel editing</button>
+    </form>
+  </section>
+
+  <section class="card" aria-label="My medicines">
+    <h2><span class="dot"></span>My medicines</h2>
+    <div id="medList"></div>
+  </section>
+
+  <section class="card" aria-label="Reminders">
+    <h2><span class="dot"></span>Reminders</h2>
+    <button type="button" class="btn btn-ghost" id="enableNotifBtn">Enable reminders</button>
+    <p id="notifStatus"></p>
+    <p class="reminder-note">Reminders only work while this app is open in a browser tab — there&rsquo;s no server. When a dose time arrives while this tab is open, you will get a browser notification and the dose card will be highlighted.</p>
+  </section>
+
+  <footer>
+    All data is stored only in this browser (localStorage).<br>
+    Built by Nafiz Bin Azad
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var MEDS_KEY = "medrx_meds";
+  var CHECKS_KEY = "medrx_checks";
+
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  function dateStr(d){
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  }
+  function todayStr(){ return dateStr(new Date()); }
+  function esc(s){
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+  function uid(){ return "m" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function loadMeds(){
+    try{
+      var raw = localStorage.getItem(MEDS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function saveMeds(meds){ localStorage.setItem(MEDS_KEY, JSON.stringify(meds)); }
+  function loadChecks(){
+    try{
+      var raw = localStorage.getItem(CHECKS_KEY);
+      var obj = raw ? JSON.parse(raw) : {};
+      return (obj && typeof obj === "object" && !Array.isArray(obj)) ? obj : {};
+    }catch(e){ return {}; }
+  }
+  function saveChecks(checks){ localStorage.setItem(CHECKS_KEY, JSON.stringify(checks)); }
+
+  var editingId = null;
+  var notified = {}; // "medId@HH:MM" already notified today
+
+  var els = {
+    dateLine: document.getElementById("dateLine"),
+    banner: document.getElementById("lowStockBanner"),
+    todayList: document.getElementById("todayList"),
+    medList: document.getElementById("medList"),
+    adherencePct: document.getElementById("adherencePct"),
+    adherenceBars: document.getElementById("adherenceBars"),
+    form: document.getElementById("medForm"),
+    formTitle: document.getElementById("formTitle"),
+    name: document.getElementById("medName"),
+    dose: document.getElementById("medDose"),
+    stock: document.getElementById("medStock"),
+    note: document.getElementById("medNote"),
+    chipRow: document.getElementById("chipRow"),
+    customTimes: document.getElementById("customTimes"),
+    addTimeBtn: document.getElementById("addTimeBtn"),
+    formError: document.getElementById("formError"),
+    submitBtn: document.getElementById("submitBtn"),
+    cancelEditBtn: document.getElementById("cancelEditBtn"),
+    enableNotifBtn: document.getElementById("enableNotifBtn"),
+    notifStatus: document.getElementById("notifStatus")
+  };
+
+  function daysLeft(med){
+    var perDay = (med.times && med.times.length) ? med.times.length : 0;
+    if(perDay <= 0) return Infinity;
+    return Math.floor((Number(med.stock) || 0) / perDay);
+  }
+
+  function renderBanner(meds){
+    var low = meds.filter(function(m){ return daysLeft(m) <= 3; });
+    if(!low.length){ els.banner.className = ""; els.banner.innerHTML = ""; return; }
+    var items = low.map(function(m){
+      var d = daysLeft(m);
+      return "<li><strong>" + esc(m.name) + "</strong> — " + d + (d === 1 ? " day" : " days") +
+             " left (" + (Number(m.stock)||0) + " doses in stock)</li>";
+    }).join("");
+    els.banner.className = "show";
+    els.banner.innerHTML = "<strong>Low stock warning</strong><ul>" + items + "</ul>";
+  }
+
+  function renderAdherence(meds, checks){
+    var days = [];
+    var totalScheduled = 0, totalChecked = 0;
+    for(var i = 6; i >= 0; i--){
+      var d = new Date(); d.setDate(d.getDate() - i);
+      var ds = dateStr(d);
+      var scheduled = 0, checked = 0;
+      meds.forEach(function(m){
+        if(m.createdAt && ds >= m.createdAt){
+          scheduled += (m.times || []).length;
+        }
+      });
+      var dayChecks = checks[ds] || [];
+      // Count only checks that belong to a known medicine
+      dayChecks.forEach(function(key){
+        var medId = key.split("@")[0];
+        if(meds.some(function(m){ return m.id === medId; })) checked++;
+      });
+      if(checked > scheduled) checked = scheduled;
+      var pct = scheduled > 0 ? Math.round(checked / scheduled * 100) : 0;
+      days.push({ date: ds, pct: pct, scheduled: scheduled, checked: checked,
+                  label: "SMTWTFS"[d.getDay()] });
+      totalScheduled += scheduled; totalChecked += checked;
+    }
+    var weekly = totalScheduled > 0 ? Math.round(totalChecked / totalScheduled * 100) : 0;
+    els.adherencePct.textContent = totalScheduled > 0 ? weekly + "%" : "—";
+    els.adherencePct.setAttribute("data-weekly-pct", String(weekly));
+    els.adherenceBars.innerHTML = days.map(function(day){
+      return '<div class="bar-col">' +
+        '<span class="bar-pct">' + (day.scheduled > 0 ? day.pct + "%" : "–") + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" data-date="' + day.date + '" data-pct="' + day.pct +
+          '" style="height:' + day.pct + '%"></div></div>' +
+        '<span class="bar-day">' + day.label + '</span></div>';
+    }).join("");
+  }
+
+  function renderToday(meds, checks){
+    var t = todayStr();
+    var dayChecks = checks[t] || [];
+    var doses = [];
+    meds.forEach(function(m){
+      (m.times || []).forEach(function(time){
+        doses.push({ med: m, time: time, key: m.id + "@" + time,
+                     done: dayChecks.indexOf(m.id + "@" + time) !== -1 });
+      });
+    });
+    doses.sort(function(a,b){ return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+
+    if(!doses.length){
+      els.todayList.innerHTML = '<p class="empty">No doses scheduled for today yet. Add a medicine below to get started.</p>';
+      return;
+    }
+    var now = new Date();
+    var nowHHMM = pad(now.getHours()) + ":" + pad(now.getMinutes());
+    els.todayList.innerHTML = doses.map(function(d){
+      var outOfStock = !d.done && (Number(d.med.stock) || 0) <= 0;
+      var due = !d.done && d.time <= nowHHMM;
+      var classes = "dose-card" + (d.done ? " done" : "") + (due ? " due" : "") +
+                    (notified[d.key] ? " notified" : "");
+      return '<div class="' + classes + '" data-med-id="' + esc(d.med.id) + '" data-time="' + esc(d.time) + '">' +
+        '<div class="dose-info">' +
+          '<div class="dose-name">' + esc(d.med.name) + '</div>' +
+          '<div class="dose-meta">' + esc(d.med.dose) + (d.med.note ? " · " + esc(d.med.note) : "") + '</div>' +
+          (outOfStock ? '<div class="stock-note">Out of stock — restock to take this dose.</div>' : "") +
+        '</div>' +
+        '<div class="dose-time">' + esc(d.time) + '</div>' +
+        '<button type="button" class="check-btn" data-med-id="' + esc(d.med.id) + '" data-time="' + esc(d.time) + '"' +
+          (outOfStock ? " disabled" : "") +
+          ' aria-label="Mark ' + esc(d.med.name) + ' at ' + esc(d.time) + ' as taken" aria-pressed="' + (d.done ? "true" : "false") + '">' +
+          (d.done ? "&#10003;" : "") + '</button>' +
+      '</div>';
+    }).join("");
+
+    Array.prototype.forEach.call(els.todayList.querySelectorAll(".check-btn"), function(btn){
+      btn.addEventListener("click", function(){
+        toggleDose(btn.getAttribute("data-med-id"), btn.getAttribute("data-time"));
+      });
+    });
+  }
+
+  function renderMeds(meds){
+    if(!meds.length){
+      els.medList.innerHTML = '<p class="empty">No medicines added yet.</p>';
+      return;
+    }
+    els.medList.innerHTML = meds.map(function(m){
+      var d = daysLeft(m);
+      var lowCls = d <= 3 ? " low" : "";
+      var daysTxt = (m.times && m.times.length)
+        ? " · about " + d + (d === 1 ? " day" : " days") + " left" : "";
+      var timePills = (m.times || []).slice().sort().map(function(t){
+        return '<span class="time-pill">' + esc(t) + '</span>';
+      }).join("");
+      return '<div class="med-card" data-med-id="' + esc(m.id) + '">' +
+        '<div class="med-head"><div class="med-name">' + esc(m.name) + '</div></div>' +
+        '<div class="med-dose">' + esc(m.dose) + '</div>' +
+        '<div class="med-times">' + timePills + '</div>' +
+        '<div class="med-stock' + lowCls + '">Stock left: <strong>' + (Number(m.stock)||0) + '</strong>' + esc(daysTxt) + '</div>' +
+        (m.note ? '<div class="med-note">' + esc(m.note) + '</div>' : "") +
+        '<div class="med-actions">' +
+          '<button type="button" class="btn btn-small edit-btn" data-med-id="' + esc(m.id) + '">Edit</button>' +
+          '<button type="button" class="btn btn-small delete-btn" data-med-id="' + esc(m.id) + '">Delete</button>' +
+        '</div></div>';
+    }).join("");
+
+    Array.prototype.forEach.call(els.medList.querySelectorAll(".edit-btn"), function(btn){
+      btn.addEventListener("click", function(){ startEdit(btn.getAttribute("data-med-id")); });
+    });
+    Array.prototype.forEach.call(els.medList.querySelectorAll(".delete-btn"), function(btn){
+      btn.addEventListener("click", function(){ deleteMed(btn.getAttribute("data-med-id")); });
+    });
+  }
+
+  function renderAll(){
+    var meds = loadMeds();
+    var checks = loadChecks();
+    var now = new Date();
+    els.dateLine.textContent = now.toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    renderBanner(meds);
+    renderAdherence(meds, checks);
+    renderToday(meds, checks);
+    renderMeds(meds);
+  }
+
+  function toggleDose(medId, time){
+    var meds = loadMeds();
+    var med = null;
+    meds.forEach(function(m){ if(m.id === medId) med = m; });
+    if(!med) return;
+    var checks = loadChecks();
+    var t = todayStr();
+    var key = medId + "@" + time;
+    if(!Array.isArray(checks[t])) checks[t] = [];
+    var idx = checks[t].indexOf(key);
+    if(idx === -1){
+      if((Number(med.stock) || 0) <= 0) return; // out of stock: cannot check
+      checks[t].push(key);
+      med.stock = Math.max(0, (Number(med.stock) || 0) - 1);
+    }else{
+      checks[t].splice(idx, 1);
+      med.stock = (Number(med.stock) || 0) + 1;
+    }
+    if(checks[t].length === 0) delete checks[t];
+    saveChecks(checks);
+    saveMeds(meds);
+    renderAll();
+  }
+
+  function deleteMed(medId){
+    var meds = loadMeds().filter(function(m){ return m.id !== medId; });
+    saveMeds(meds);
+    // Remove that medicine's checks so adherence stays honest
+    var checks = loadChecks();
+    Object.keys(checks).forEach(function(ds){
+      checks[ds] = checks[ds].filter(function(k){ return k.split("@")[0] !== medId; });
+      if(checks[ds].length === 0) delete checks[ds];
+    });
+    saveChecks(checks);
+    if(editingId === medId) resetForm();
+    renderAll();
+  }
+
+  /* ---- Form handling ---- */
+  function addCustomTimeRow(value){
+    var row = document.createElement("div");
+    row.className = "custom-row";
+    var input = document.createElement("input");
+    input.type = "time";
+    input.className = "custom-time-input";
+    if(value) input.value = value;
+    var rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "remove-time";
+    rm.textContent = "×";
+    rm.setAttribute("aria-label", "Remove this time");
+    rm.addEventListener("click", function(){ row.parentNode.removeChild(row); });
+    row.appendChild(input);
+    row.appendChild(rm);
+    els.customTimes.appendChild(row);
+    return input;
+  }
+  els.addTimeBtn.addEventListener("click", function(){ addCustomTimeRow(""); });
+
+  Array.prototype.forEach.call(els.chipRow.querySelectorAll(".chip"), function(chip){
+    chip.addEventListener("click", function(){ chip.classList.toggle("active"); });
+  });
+
+  function selectedTimes(){
+    var times = [];
+    Array.prototype.forEach.call(els.chipRow.querySelectorAll(".chip.active"), function(chip){
+      times.push(chip.getAttribute("data-time"));
+    });
+    Array.prototype.forEach.call(els.customTimes.querySelectorAll(".custom-time-input"), function(inp){
+      if(inp.value) times.push(inp.value);
+    });
+    // de-duplicate + sort
+    var seen = {}, out = [];
+    times.forEach(function(t){ if(!seen[t]){ seen[t] = true; out.push(t); } });
+    out.sort();
+    return out;
+  }
+
+  function showError(msg){
+    els.formError.textContent = msg;
+    els.formError.className = "form-error show";
+  }
+  function clearError(){
+    els.formError.textContent = "";
+    els.formError.className = "form-error";
+  }
+
+  function resetForm(){
+    editingId = null;
+    els.form.reset();
+    Array.prototype.forEach.call(els.chipRow.querySelectorAll(".chip"), function(c){ c.classList.remove("active"); });
+    els.customTimes.innerHTML = "";
+    els.formTitle.textContent = "Add a medicine";
+    els.submitBtn.textContent = "Add medicine";
+    els.cancelEditBtn.style.display = "none";
+    clearError();
+  }
+  els.cancelEditBtn.addEventListener("click", resetForm);
+
+  function startEdit(medId){
+    var med = null;
+    loadMeds().forEach(function(m){ if(m.id === medId) med = m; });
+    if(!med) return;
+    editingId = medId;
+    els.name.value = med.name || "";
+    els.dose.value = med.dose || "";
+    els.stock.value = (med.stock != null ? med.stock : "");
+    els.note.value = med.note || "";
+    Array.prototype.forEach.call(els.chipRow.querySelectorAll(".chip"), function(c){
+      c.classList.toggle("active", (med.times || []).indexOf(c.getAttribute("data-time")) !== -1);
+    });
+    els.customTimes.innerHTML = "";
+    (med.times || []).forEach(function(t){
+      var isChip = ["08:00","13:00","22:00"].indexOf(t) !== -1;
+      if(!isChip) addCustomTimeRow(t);
+    });
+    els.formTitle.textContent = "Edit medicine";
+    els.submitBtn.textContent = "Save changes";
+    els.cancelEditBtn.style.display = "block";
+    clearError();
+    els.form.scrollIntoView({ behavior:"smooth", block:"start" });
+  }
+
+  els.form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var name = els.name.value.trim();
+    var dose = els.dose.value.trim();
+    var stockVal = els.stock.value;
+    var stock = stockVal === "" ? NaN : parseInt(stockVal, 10);
+    var times = selectedTimes();
+    if(!name){ showError("Please enter the medicine name."); return; }
+    if(!dose){ showError("Please enter the dose, e.g. 1 tablet."); return; }
+    if(!times.length){ showError("Please pick at least one time (a chip or a custom time)."); return; }
+    if(isNaN(stock) || stock < 0){ showError("Please enter the total stock on hand (0 or more)."); return; }
+    clearError();
+
+    var meds = loadMeds();
+    if(editingId){
+      meds.forEach(function(m){
+        if(m.id === editingId){
+          m.name = name; m.dose = dose; m.times = times; m.stock = stock; m.note = els.note.value.trim();
+        }
+      });
+    }else{
+      meds.push({
+        id: uid(),
+        name: name,
+        dose: dose,
+        times: times,
+        stock: stock,
+        note: els.note.value.trim(),
+        createdAt: todayStr()
+      });
+    }
+    saveMeds(meds);
+    resetForm();
+    renderAll();
+  });
+
+  /* ---- Notifications (best-effort, tab must stay open) ---- */
+  function notificationsSupported(){ return typeof window !== "undefined" && "Notification" in window; }
+  els.enableNotifBtn.addEventListener("click", function(){
+    if(!notificationsSupported()){
+      els.notifStatus.textContent = "Notifications are not supported in this browser.";
+      return;
+    }
+    try{
+      var p = Notification.requestPermission();
+      if(p && typeof p.then === "function"){
+        p.then(function(perm){ els.notifStatus.textContent = "Notification permission: " + perm + "."; })
+         .catch(function(){ els.notifStatus.textContent = "Could not request notification permission."; });
+      }else{
+        els.notifStatus.textContent = "Notification permission: " + Notification.permission + ".";
+      }
+    }catch(e){
+      els.notifStatus.textContent = "Could not request notification permission.";
+    }
+  });
+
+  setInterval(function(){
+    try{
+      var meds = loadMeds();
+      if(!meds.length) return;
+      var checks = loadChecks();
+      var t = todayStr();
+      var dayChecks = checks[t] || [];
+      var now = new Date();
+      var nowHHMM = pad(now.getHours()) + ":" + pad(now.getMinutes());
+      var changed = false;
+      meds.forEach(function(m){
+        (m.times || []).forEach(function(time){
+          var key = m.id + "@" + time;
+          if(time === nowHHMM && dayChecks.indexOf(key) === -1 && !notified[key]){
+            notified[key] = true;
+            changed = true;
+            if(notificationsSupported() && Notification.permission === "granted"){
+              try{ new Notification("Time for " + m.name, { body: m.dose + " — scheduled at " + time }); }catch(e){}
+            }
+          }
+        });
+      });
+      if(changed) renderAll();
+    }catch(e){ /* never let the reminder loop crash the app */ }
+  }, 30000);
+
+  // Exposed for headless tests / debugging
+  window.__medrx = {
+    loadMeds: loadMeds, saveMeds: saveMeds,
+    loadChecks: loadChecks, saveChecks: saveChecks,
+    renderAll: renderAll, todayStr: todayStr, daysLeft: daysLeft,
+    toggleDose: toggleDose, deleteMed: deleteMed
+  };
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
